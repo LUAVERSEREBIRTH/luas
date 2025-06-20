@@ -1,0 +1,256 @@
+-- Gelişmiş Aim Assist (FOV Çizimli + Team Check) - by EGE BRANDO
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+-- Ayarlar
+local AIM_ENABLED = false
+local SMOOTHNESS = 1
+local MAX_DISTANCE = 1200
+local SHOW_FOV = true
+local FOV_COLOR = Color3.fromRGB(0, 255, 0)
+local FOV_TRANSPARENCY = 0.7
+local TEAM_CHECK = false -- Team check başlangıçta kapalı
+
+-- FOV Ayarları
+local currentFOV = 35
+local minFOV, maxFOV = 10, 60
+
+-- FOV Çizimleri
+local fovCircle = Instance.new("Frame")
+fovCircle.Name = "FOVCircle"
+fovCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+fovCircle.Size = UDim2.new(0, 200, 0, 200)
+fovCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
+fovCircle.BackgroundTransparency = 1
+fovCircle.BorderSizePixel = 0
+fovCircle.Visible = SHOW_FOV
+
+local fovOutline = Instance.new("UICorner")
+fovOutline.CornerRadius = UDim.new(1, 0)
+fovOutline.Parent = fovCircle
+
+local fovStroke = Instance.new("UIStroke")
+fovStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+fovStroke.Color = FOV_COLOR
+fovStroke.Transparency = FOV_TRANSPARENCY
+fovStroke.Thickness = 1
+fovStroke.Parent = fovCircle
+
+-- GUI Oluşturma
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AimAssistGUI"
+screenGui.Parent = CoreGui
+screenGui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 200, 0, 150) -- Yükseklik artırıldı
+frame.Position = UDim2.new(0.78, 0, 0.7, 0)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+frame.BackgroundTransparency = 0.25
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+-- FOV Çizimini GUI'ye ekle
+fovCircle.Parent = screenGui
+
+-- Başlık
+local title = Instance.new("TextLabel")
+title.Text = "AIM ASSIST v4"
+title.Size = UDim2.new(1, 0, 0, 25)
+title.Position = UDim2.new(0, 0, 0, 5)
+title.BackgroundTransparency = 1
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.Parent = frame
+
+-- Aç/Kapa Butonu
+local toggleButton = Instance.new("TextButton")
+toggleButton.Text = "AÇIK"
+toggleButton.Size = UDim2.new(0.9, 0, 0, 25)
+toggleButton.Position = UDim2.new(0.05, 0, 0.25, 0)
+toggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.Font = Enum.Font.GothamBold
+toggleButton.TextSize = 14
+toggleButton.Parent = frame
+
+-- Team Check Butonu
+local teamCheckButton = Instance.new("TextButton")
+teamCheckButton.Text = "TEAM CHECK: KAPALI"
+teamCheckButton.Size = UDim2.new(0.9, 0, 0, 25)
+teamCheckButton.Position = UDim2.new(0.05, 0, 0.55, 0)
+teamCheckButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+teamCheckButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+teamCheckButton.Font = Enum.Font.GothamBold
+teamCheckButton.TextSize = 12
+teamCheckButton.Parent = frame
+
+-- FOV Değer Göstergesi
+local fovLabel = Instance.new("TextLabel")
+fovLabel.Text = string.format("FOV: %d°", currentFOV)
+fovLabel.Size = UDim2.new(1, 0, 0, 20)
+fovLabel.Position = UDim2.new(0, 0, 0.8, 0)
+fovLabel.BackgroundTransparency = 1
+fovLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+fovLabel.Font = Enum.Font.Gotham
+fovLabel.TextSize = 12
+fovLabel.Parent = frame
+
+-- EGE BRANDO Yazısı
+local creditLabel = Instance.new("TextLabel")
+creditLabel.Text = "created by LUA VERSE"
+creditLabel.Size = UDim2.new(1, 0, 0, 15)
+creditLabel.Position = UDim2.new(0, 0, 1, -15)
+creditLabel.BackgroundTransparency = 1
+creditLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+creditLabel.Font = Enum.Font.Gotham
+creditLabel.TextSize = 10
+creditLabel.TextXAlignment = Enum.TextXAlignment.Right
+creditLabel.Parent = frame
+
+-- FOV Çapını Güncelleme
+local function updateFOV()
+    local screenSize = workspace.CurrentCamera.ViewportSize
+    local radius = math.tan(math.rad(currentFOV/2)) * screenSize.X/2
+    fovCircle.Size = UDim2.new(0, radius*2, 0, radius*2)
+    fovLabel.Text = string.format("FOV: %d°", currentFOV)
+end
+
+-- FOV Değerini Değiştirme
+local function changeFOV(amount)
+    currentFOV = math.clamp(currentFOV + amount, minFOV, maxFOV)
+    updateFOV()
+end
+
+-- Aynı takımda mı kontrolü
+local function isTeammate(otherPlayer)
+    if not TEAM_CHECK then return false end
+    
+    -- Standart takım kontrolü
+    if player.Team and otherPlayer.Team then
+        return player.Team == otherPlayer.Team
+    end
+    
+    -- Özel takım sistemleri için alternatif kontrol
+    local playerCharacter = player.Character
+    local otherCharacter = otherPlayer.Character
+    
+    if playerCharacter and otherCharacter then
+        -- Özel takım tag'leri varsa burada kontrol edilebilir
+        -- Örnek: return playerCharacter:FindFirstChild("TeamTag") == otherCharacter:FindFirstChild("TeamTag")
+    end
+    
+    return false
+end
+
+-- Buton animasyonu
+local function animateButton(button)
+    local originalSize = button.Size
+    button.Size = UDim2.new(originalSize.X.Scale * 0.95, originalSize.X.Offset * 0.95, 
+                           originalSize.Y.Scale * 0.95, originalSize.Y.Offset * 0.95)
+    task.wait(0.08)
+    button.Size = originalSize
+end
+
+-- Aç/Kapa butonu
+toggleButton.MouseButton1Click:Connect(function()
+    animateButton(toggleButton)
+    AIM_ENABLED = not AIM_ENABLED
+    if AIM_ENABLED then
+        toggleButton.Text = "AÇIK"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(70, 180, 70)
+    else
+        toggleButton.Text = "KAPALI"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(180, 70, 70)
+    end
+end)
+
+-- Team Check butonu
+teamCheckButton.MouseButton1Click:Connect(function()
+    animateButton(teamCheckButton)
+    TEAM_CHECK = not TEAM_CHECK
+    if TEAM_CHECK then
+        teamCheckButton.Text = "TEAM CHECK: AÇIK"
+        teamCheckButton.BackgroundColor3 = Color3.fromRGB(70, 70, 180)
+    else
+        teamCheckButton.Text = "TEAM CHECK: KAPALI"
+        teamCheckButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    end
+end)
+
+-- FOV Değiştirme Tuşları
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.PageUp then
+        changeFOV(5)
+    elseif input.KeyCode == Enum.KeyCode.PageDown then
+        changeFOV(-5)
+    end
+end)
+
+-- Karakter kontrolü
+local function getHumanoid()
+    local character = player.Character
+    if not character then
+        character = player.CharacterAdded:Wait()
+    end
+    return character:WaitForChild("Humanoid")
+end
+
+-- En yakın hedefi bulma (team check dahil)
+local function getClosestHead()
+    local closestHead, minAngle = nil, currentFOV
+    local cameraPos = camera.CFrame.Position
+    local cameraLook = camera.CFrame.LookVector
+    
+    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+        if otherPlayer ~= player and otherPlayer.Character and not isTeammate(otherPlayer) then
+            local head = otherPlayer.Character:FindFirstChild("Head")
+            if head then
+                local direction = (head.Position - cameraPos).Unit
+                local angle = math.deg(math.acos(cameraLook:Dot(direction)))
+                local distance = (head.Position - cameraPos).Magnitude
+                
+                if angle < minAngle and distance < MAX_DISTANCE then
+                    minAngle = angle
+                    closestHead = head
+                end
+            end
+        end
+    end
+    
+    return closestHead
+end
+
+-- Hedefe kitlenme
+local function aimAtTarget(targetHead)
+    local currentCF = camera.CFrame
+    local targetPos = targetHead.Position
+    local newLook = (targetPos - currentCF.Position).Unit
+    local smoothLook = currentCF.LookVector:Lerp(newLook, SMOOTHNESS)
+    camera.CFrame = CFrame.new(currentCF.Position, currentCF.Position + smoothLook)
+end
+
+-- FOV güncellemesini başlat
+updateFOV()
+
+-- Ana döngü
+RunService.RenderStepped:Connect(function()
+    local humanoid = getHumanoid()
+    if humanoid.Health <= 0 then return end
+    
+    if AIM_ENABLED and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        local targetHead = getClosestHead()
+        if targetHead then
+            aimAtTarget(targetHead)
+        end
+    end
+end)
