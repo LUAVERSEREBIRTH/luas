@@ -1,0 +1,104 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local localPlayer = Players.LocalPlayer
+
+-- GUI Oluştur
+local screenGui = Instance.new("ScreenGui", localPlayer:WaitForChild("PlayerGui"))
+screenGui.Name = "ESP_GUI"
+screenGui.ResetOnSpawn = false
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 160, 0, 60)
+mainFrame.Position = UDim2.new(0, 10, 0, 10)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = mainFrame
+
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(1, -20, 0, 40)
+toggleButton.Position = UDim2.new(0, 10, 0, 10)
+toggleButton.Text = "ESP: AÇIK"
+toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.Font = Enum.Font.Gotham
+toggleButton.TextSize = 16
+toggleButton.Parent = mainFrame
+
+local buttonCorner = Instance.new("UICorner")
+buttonCorner.CornerRadius = UDim.new(0, 8)
+buttonCorner.Parent = toggleButton
+
+-- ESP Ayarları
+local ESP_ENABLED = true
+local allAdornments = {}
+
+-- Kutuyu oluştur
+function createBox(part, color)
+	local adornment = Instance.new("BoxHandleAdornment")
+	adornment.Adornee = part
+	adornment.AlwaysOnTop = true
+	adornment.ZIndex = 5
+	adornment.Size = part.Size + Vector3.new(0.1, 0.1, 0.1)
+	adornment.Color3 = color
+	adornment.Transparency = 0.5
+	adornment.Visible = ESP_ENABLED
+	adornment.Parent = part
+	table.insert(allAdornments, adornment)
+end
+
+-- Karaktere ESP uygula ve yeni parçaları dinle
+function applyESPToCharacter(character, color)
+	for _, part in ipairs(character:GetChildren()) do
+		if part:IsA("BasePart") then
+			createBox(part, color)
+		end
+	end
+
+	-- Yeni parçalar geldiğinde de ESP uygula
+	character.ChildAdded:Connect(function(part)
+		if part:IsA("BasePart") then
+			createBox(part, color)
+		end
+	end)
+end
+
+-- Oyuncuya ESP uygula
+function onPlayerAdded(player)
+	if player == localPlayer then return end
+
+	player.CharacterAdded:Connect(function(character)
+		character:WaitForChild("HumanoidRootPart", 5)
+		applyESPToCharacter(character, Color3.fromRGB(255, 0, 0))
+	end)
+
+	if player.Character then
+		applyESPToCharacter(player.Character, Color3.fromRGB(255, 0, 0))
+	end
+end
+
+-- Mevcut oyunculara uygula
+for _, player in ipairs(Players:GetPlayers()) do
+	onPlayerAdded(player)
+end
+
+-- Yeni gelen oyuncular
+Players.PlayerAdded:Connect(onPlayerAdded)
+
+-- Butona tıklama ile aç/kapa
+toggleButton.MouseButton1Click:Connect(function()
+	ESP_ENABLED = not ESP_ENABLED
+	toggleButton.Text = ESP_ENABLED and "ESP: AÇIK" or "ESP: KAPALI"
+	toggleButton.BackgroundColor3 = ESP_ENABLED and Color3.fromRGB(40, 40, 40) or Color3.fromRGB(80, 0, 0)
+
+	for _, adornment in ipairs(allAdornments) do
+		if adornment and adornment:IsA("BoxHandleAdornment") then
+			adornment.Visible = ESP_ENABLED
+		end
+	end
+end)
