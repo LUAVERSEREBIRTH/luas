@@ -93,7 +93,7 @@ Players.PlayerAdded:Connect(onPlayerAdded)
 -- Butona tıklama ile aç/kapa
 toggleButton.MouseButton1Click:Connect(function()
 	ESP_ENABLED = not ESP_ENABLED
-	toggleButton.Text = ESP_ENABLED and "ESP: AÇIK" or "ESP: KAPALI"
+	toggleButton.Text = ESP_ENABLED and "ESP: ON" or "ESP: OFF"
 	toggleButton.BackgroundColor3 = ESP_ENABLED and Color3.fromRGB(40, 40, 40) or Color3.fromRGB(80, 0, 0)
 
 	for _, adornment in ipairs(allAdornments) do
